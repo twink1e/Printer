@@ -10,6 +10,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 
+
 public class Printer {
 
 	// Assumptions
@@ -52,6 +53,7 @@ public class Printer {
 		readAndWrite();
 
 		closeFiles();
+
 	}
 
 	private static void closeFiles() {
@@ -116,22 +118,48 @@ public class Printer {
 		}
 	}
 
-	private static void checkFullRow() {
+	private static void checkFullRow()   {
 		if (charCount == MAX_W) {
+			boolean canBreakWord = checkNextChar();
+			if (canBreakWord){
+				currentWord = MAX_W;
+			}
 			//write line until last complete word
 			writeLine(new String(line, 0, currentWord));
 			lineCount++;
-			char[] temp = new char[MAX_W];
-			charCount = 0;
-			//add the unfinished word to the new line
-			for (int i = 0; i < MAX_W - currentWord; i++) {
-				temp[i] = line[i + currentWord];
-				charCount++;
-			}
-			line = temp;
-			currentWord = 0;
+			prepareNextLine(canBreakWord);
 
 		}
+	}
+
+	private static void prepareNextLine(boolean canBreakWord) {
+		char[] temp = new char[MAX_W];
+		charCount = 0;
+		//add the unfinished word to the new line
+		for (int i = 0; i < MAX_W - currentWord; i++) {
+			temp[i] = line[i + currentWord];
+			charCount++;
+		}
+		if(!canBreakWord) {
+			temp[charCount] = (char)c;
+			charCount++;
+		}
+		line = temp;
+		currentWord = 0;
+	}
+
+	private static boolean checkNextChar() {
+		boolean canBreakWord = false;
+		try {
+			if ((c = reader.read()) != -1) {
+				if (c == TAB || c == NEW_LINE || c == LINE_BREAK || c == SPACE) {
+					canBreakWord = true;
+				} 
+			}
+		} catch (IOException e) {
+			System.out.println("Error reading character");
+		}
+		return canBreakWord;
 	}
 
 	private static void processNewLine() {
@@ -162,9 +190,8 @@ public class Printer {
 	}
 
 	private static void writeLine(String line) {
-		//System.out.println(line);
 		try {
-			writer.write(line, 0, line.length());
+			writer.write(line);
 			writer.newLine();
 		} catch (IOException e) {
 			System.out.println("Error writing to file");
@@ -172,7 +199,6 @@ public class Printer {
 	}
 	
 	private static void writeLastLine(String line) {
-		//System.out.println(line);
 		try {
 			writer.write(line, 0, line.length());
 		} catch (IOException e) {
@@ -212,3 +238,4 @@ public class Printer {
 
 	}
 }
+
