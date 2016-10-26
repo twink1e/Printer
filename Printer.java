@@ -51,11 +51,12 @@ public class Printer {
 
 		readAndWrite();
 
-		closeFile();
+		closeFiles();
 	}
 
-	private static void closeFile() {
+	private static void closeFiles() {
 		try {
+			reader.close();
 			writer.close();
 		} catch (IOException e) {
 			System.out.println("Can't close file");
@@ -208,5 +209,6 @@ public class Printer {
 			System.exit(1);
 		}
 		reader = in;
+
 	}
 }
