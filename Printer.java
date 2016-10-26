@@ -1,41 +1,40 @@
-
-
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
-import java.io.PrintWriter;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 
 public class Printer {
-	
+
 	// Assumptions
+	// page height is 99 lines, excluding the page break
+	// page width is 105 chars
 	final static int MAX_H = 99, MAX_W = 105;
 	final static String charSet = "US-ASCII";
-		//final static String charSet = "UTF-8";
 
-	//Special chars
+	// Special chars
 	final static int TAB = 9, NEW_LINE = 10, LINE_BREAK = 13, SPACE = 32;
-	
+
 	final static char[] PAGE_BREAK = new char[MAX_W];
-	
+
 	static BufferedReader reader = null;
-	//static BufferedWriter writer = null;
-	static PrintWriter writer = null;
-	static int c, charCount = 0, lineCount = 0, freeSpace ;
-	static String line = new String();
-	static char[] word = new char[MAX_W];
+	static BufferedWriter writer = null;
+
+	static int c, //ascii code of current char
+		charCount = 0, //number of char in the current line
+		lineCount = 0, //number of lines in the current page
+		currentWord = 0; //the index of the start of the current word in the line
+	static char[] line = new char[MAX_W];
 
 	public static void main(String[] args) {
-		
-		Arrays.fill (PAGE_BREAK, '=');
+
+		Arrays.fill(PAGE_BREAK, '=');
 
 		if (args.length != 2) {
 			System.out.println("Usage: Printer <input file> <output file>");
@@ -45,117 +44,144 @@ public class Printer {
 		String outputFileName = args[1];
 
 		setReader(charSet, inputFileName);
-		//setWriter(outputFileName);
-		try {writer = new PrintWriter(outputFileName, charSet);
-		}catch (FileNotFoundException e)  {
+		setWriter(outputFileName);
 
-		}catch (UnsupportedEncodingException e){
+		assert (reader != null);
+		assert (writer != null);
 
-		}
-		assert(reader != null);
-		assert(writer!=null);
-		
 		readAndWrite();
-		
+
 		closeFile();
 	}
 
 	private static void closeFile() {
-		//try {
+		try {
 			writer.close();
-		//} catch (IOException e) {
-		//	System.out.println("Can't close file");
-		//}
+		} catch (IOException e) {
+			System.out.println("Can't close file");
+		}
 	}
 
 	private static void readAndWrite() {
 		try {
-			while((c=reader.read()) != -1){
-				//ignore these special chars if they are at the very beginning of a line
-				if (line.length()==0 && charCount==0 && (c==TAB || c==NEW_LINE || c==LINE_BREAK || c==SPACE)){
+			while ((c = reader.read()) != -1) {
+				// ignore these special chars if they are at the very beginning
+				// of a line
+				if (charCount == 0
+						&& (c == TAB || c == NEW_LINE || c == LINE_BREAK || c == SPACE)) {
 					continue;
 				} else {
 					processChar();
-				}	
+				}
 			}
+			writeLastLine(new String(line));
 		} catch (IOException e) {
 			System.out.println("Error reading character");
 		}
 	}
 
 	private static void processChar() {
-		//minus 1 for the space
-		freeSpace = MAX_W - line.length() -1;
-		if(line.length()==0||c==TAB) freeSpace++;
-		//System.out.print((char)c);
-		switch (c){
-			case TAB: 
-				//add in at most 4 spaces but not exceeding width
-				//freeSpace++;
-				for (int i = 0; i < 4; i++) {
-					if (charCount == freeSpace){
-						break;
-					}
-					word [charCount]=' ';
-					charCount++;
-				}
-				line = line + new String(word);
-				word = new char[MAX_W];
-				charCount = 0;
-				break;
-				
-			case SPACE:
-				//word breaker
-				if (line.length()==0){
-					line = new String(word);
-				}else{
-				line = line + " " + new String(word);
-			}
-				word = new char[MAX_W];
-				charCount = 0;
-				break;
-		
-			case NEW_LINE:
-			case LINE_BREAK:
-				if (charCount<=freeSpace){
-					if(line.length()==0){
-						writeLine(new String(word));
-					}else{
-					writeLine(line +" " + new String(word));
-				}
-					line = "";
-					word = new char[MAX_W];
-					charCount = 0;
-				} else {
-					writeLine(line);
-					line = "";
-				}
-				lineCount++;
-				break;
-			default:
-				word[charCount] = (char)c;
-				charCount++;
+		switch (c) {
+		case TAB:
+			//add spaces for tab and set word breaker
+			processTab();
+			break;
+
+		case SPACE:
+			//set word breaker
+			processSpace();
+			break;
+
+		case NEW_LINE:
+		case LINE_BREAK:
+			//print line
+			processNewLine();
+			break;
+			
+		default:
+			line[charCount] = (char) c;
+			charCount++;
 		}
-		if(lineCount == MAX_H){
+		//print row if row is full
+		checkFullRow();
+		//print page breaker if page is full
+		checkFullPage();
+	}
+
+	private static void checkFullPage() {
+		if (lineCount == MAX_H) {
 			writeLine(new String(PAGE_BREAK));
 			lineCount = 0;
 		}
 	}
 
+	private static void checkFullRow() {
+		if (charCount == MAX_W) {
+			//write line until last complete word
+			writeLine(new String(line, 0, currentWord));
+			lineCount++;
+			char[] temp = new char[MAX_W];
+			charCount = 0;
+			//add the unfinished word to the new line
+			for (int i = 0; i < MAX_W - currentWord; i++) {
+				temp[i] = line[i + currentWord];
+				charCount++;
+			}
+			line = temp;
+			currentWord = 0;
+
+		}
+	}
+
+	private static void processNewLine() {
+		writeLine(new String(line));
+		line = new char[MAX_W];
+		lineCount++;
+		charCount = 0;
+		currentWord = 0;
+	}
+
+	private static void processSpace() {
+		line[charCount] = ' ';
+		charCount++;
+		currentWord = charCount;
+	}
+
+	private static void processTab() {
+		// add in at most 4 spaces but not exceeding width
+		// set last word points to the next position
+		for (int i = 0; i < 4; i++) {
+			if (charCount == MAX_W) {
+				break;
+			}
+			line[charCount] = ' ';
+			charCount++;
+		}
+		currentWord = charCount;
+	}
+
 	private static void writeLine(String line) {
-		System.out.println(line);
-		//try {
-			writer.println(line);
-			//writer.write(line,0,line.length());
-			//writer.newLine();
-		//} catch (IOException e) {
-			//System.out.println("Error writing to file");
-		//}
+		//System.out.println(line);
+		try {
+			writer.write(line, 0, line.length());
+			writer.newLine();
+		} catch (IOException e) {
+			System.out.println("Error writing to file");
+		}
+	}
+	
+	private static void writeLastLine(String line) {
+		//System.out.println(line);
+		try {
+			writer.write(line, 0, line.length());
+		} catch (IOException e) {
+			System.out.println("Error writing to file");
+		}
 	}
 
 	private static void setWriter(String outputFileName) {
 		File outputFile = new File(outputFileName);
-		if (!outputFile.exists()){
+		if (!outputFile.exists()) {
 			try {
 				outputFile.createNewFile();
 			} catch (IOException e) {
@@ -164,23 +190,23 @@ public class Printer {
 		}
 		BufferedWriter out = null;
 		try {
-			out = new BufferedWriter(new FileWriter(outputFile.getAbsoluteFile()));
+			out = new BufferedWriter(new FileWriter(
+					outputFile.getAbsoluteFile()));
 		} catch (IOException e) {
 			System.out.println("Failed to get file writer");
 		}
-		//writer = out;
+		writer = out;
 	}
 
 	private static void setReader(final String charSet, String inputFile) {
 		BufferedReader in = null;
 		try {
-			in = new BufferedReader(new InputStreamReader(
-					new FileInputStream(new File(inputFile)),
-					Charset.forName(charSet)));
+			in = new BufferedReader(new InputStreamReader(new FileInputStream(
+					new File(inputFile)), Charset.forName(charSet)));
 		} catch (FileNotFoundException e) {
 			System.out.println("Invalid file!");
 			System.exit(1);
 		}
-		reader = in; 
+		reader = in;
 	}
 }
